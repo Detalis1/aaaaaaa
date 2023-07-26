@@ -95,18 +95,32 @@ VOID RageAim()
 	static float oX = 0, oY = 0;
 
 	float new_yaw = atan2f(y, x) * (180.0f / 3.1415926f);
-	float new_pitch = -asinf(z / dist) * (180.0f / 3.1415926f);
+	//float new_pitch = -asinf(z / dist) * (180.0f / 3.1415926f);
+	float new_pitch = atan2f(-z, hypotf(x, y)) * 180 / 3.1415927f;
 
 	new_yaw = new_yaw + oX - (delta_x * 2);
 	new_pitch = new_pitch + oY - (delta_y * 2);
-	oX = delta_x;
-	oY = delta_y;
+	oX = delta_x * 2;
+	oY = delta_y * 2;
 
 	float d_x = (new_yaw - my_angle_x) / settings.aim_smooth;
 	float d_y = (new_pitch - my_angle_y) / settings.aim_smooth;
 
-	my_angle_x += d_x;
-	my_angle_y += d_y;
+//	my_angle_x += d_x;
+//	my_angle_y += d_y;
+
+	my_angle_x = remainderf(my_angle_x + d_x, 360);
+	my_angle_y = remainderf(my_angle_y + d_y, 180);
+
+	//while (my_angle_x < -180)
+	//	my_angle_x += 360;
+//	while (my_angle_x > 180)
+//		my_angle_x -= 360;
+//	if (my_angle_y > 89)
+//		my_angle_y = 89;
+//	if (my_angle_y < -89)
+//		my_angle_y = -89;
+
 
 	DWORD xor_yaw = xorfloat(&my_angle_x, XOR_KEY_ANGLE);
 	DWORD xor_pitch = xorfloat(&my_angle_y, XOR_KEY_ANGLE);
