@@ -1,16 +1,42 @@
-VOID RageAim()
+VOID RageAim(bool rcs = false)
 {
-	entity_item target_entity;
-	ZeroMemory(&target_entity, sizeof(target_entity));
+
+	static entity_item target_entity;
+
 
 	float min_dist = 10000;
-
 	DWORD my_team = GetMem<DWORD>(local_player_addr + offsets::team);
-	Vector3 my_pos = GetMem<Vector3>(local_player_addr + offsets::read_position);
+	Vector3 my_pos = GetHeadPos();
 	if (my_pos.IsZero())
 		return;
 	int index = 0;
 
+
+	goto gofind;
+	if(target_entity.address != NULL)
+	{
+		if (!EntityValid(target_entity.address))
+			goto gofind;
+
+		DWORD ent_team = GetMem<DWORD>(target_entity.address + offsets::team);
+		if (my_team == ent_team)
+			goto gofind;
+
+		Vector3 ent_pos = GetBonePos(target_entity.address, 14);
+		Vector2 screen_ent_pos;
+		if (ent_pos.IsZero() || !Screen(&ent_pos, &screen_ent_pos))
+			goto gofind;
+
+		Vector2 p = GetCrosshairPos();
+		float screen_dist = sqrtf(powf(p.x - screen_ent_pos.x, 2) + powf(p.y - screen_ent_pos.y, 2));
+		if (screen_dist > settings.aimbot_radius)
+			goto gofind;
+
+		goto endfind;
+	}
+
+    gofind:
+	target_entity.address = NULL;
 	for (int i = 0; i < entities.size(); ++i)
 	{
 	get:
@@ -52,18 +78,19 @@ VOID RageAim()
 		return;
 	}
 
+	endfind:
+
 	DWORD dw_my_angle_x = GetMem<DWORD>(client_dll + offsets::my_angle_x) ^ XOR_KEY_ANGLE;
 	DWORD dw_my_angle_y = GetMem<DWORD>(client_dll + offsets::my_angle_y) ^ XOR_KEY_ANGLE;
 
 	float my_angle_x = *reinterpret_cast<float*>(&dw_my_angle_x);
 	float my_angle_y = *reinterpret_cast<float*>(&dw_my_angle_y);
 
+//	float delta_x = angle_x_with_punch - my_angle_x;
+//	float delta_y = angle_y_with_punch - my_angle_y;
 
-	float angle_x_with_punch = GetMem<float>(client_dll + 0x13E3D60);
-	float angle_y_with_punch = GetMem<float>(client_dll + 0x13E3D5C);
-
-	float delta_x = angle_x_with_punch - my_angle_x;
-	float delta_y = angle_y_with_punch - my_angle_y;
+	float delta_x = GetMem<float>(local_player_addr + offsets::punch_x);
+	float delta_y = GetMem<float>(local_player_addr + offsets::punch_y);
 
 	Vector3 ent_pos = GetBonePos(target_entity.address, 14);
 
@@ -72,7 +99,7 @@ VOID RageAim()
 		return;
 	}
 
-	ent_pos.z += 1.0f;
+	ent_pos.z += 3.0f;
 	//ent_pos = GetMem<Vector3>(target_entity.address + offsets::read_position);
 	//ent_pos.z += 10.0f;
 
@@ -82,10 +109,6 @@ VOID RageAim()
 	{
 		return;
 	}
-	if (GetAsyncKeyState(VK_CONTROL)) // костыль на время
-		my_pos.z += 47.0f;
-	else 
-		my_pos.z += 70;
 
 	float x = ent_pos.x - my_pos.x;
 	float y = ent_pos.y - my_pos.y;
@@ -98,34 +121,34 @@ VOID RageAim()
 	//float new_pitch = -asinf(z / dist) * (180.0f / 3.1415926f);
 	float new_pitch = atan2f(-z, hypotf(x, y)) * 180 / 3.1415927f;
 
-	new_yaw = new_yaw + oX - (delta_x * 2);
-	new_pitch = new_pitch + oY - (delta_y * 2);
-	oX = delta_x * 2;
-	oY = delta_y * 2;
+//	new_yaw = new_yaw + oX - (delta_x * 2);
+//	new_pitch = new_pitch + oY - (delta_y * 2);
+	if (rcs)
+	{
+		new_yaw -= remainderf((delta_x) * 2, 360);
+		new_pitch -= remainderf((delta_y) * 2, 180);
+	}
 
-	float d_x = (new_yaw - my_angle_x) / settings.aim_smooth;
-	float d_y = (new_pitch - my_angle_y) / settings.aim_smooth;
+//	oX = delta_x * 2;
+//	oY = delta_y * 2;
 
-//	my_angle_x += d_x;
-//	my_angle_y += d_y;
+//	float d_x = (new_yaw - my_angle_x) / settings.aim_smooth;
+//	float d_y = (new_pitch - my_angle_y) / settings.aim_smooth;
 
-	my_angle_x = remainderf(my_angle_x + d_x, 360);
-	my_angle_y = remainderf(my_angle_y + d_y, 180);
+	float d_x = remainderf(new_yaw - my_angle_x, 360) / settings.aim_smooth;
+	float d_y = remainderf(new_pitch - my_angle_y, 180) / settings.aim_smooth;
 
-	//while (my_angle_x < -180)
-	//	my_angle_x += 360;
-//	while (my_angle_x > 180)
-//		my_angle_x -= 360;
-//	if (my_angle_y > 89)
-//		my_angle_y = 89;
-//	if (my_angle_y < -89)
-//		my_angle_y = -89;
+
+	my_angle_x += d_x;
+	my_angle_y += d_y;
 
 
 	DWORD xor_yaw = xorfloat(&my_angle_x, XOR_KEY_ANGLE);
 	DWORD xor_pitch = xorfloat(&my_angle_y, XOR_KEY_ANGLE);
 	WriteMem<DWORD>(client_dll + offsets::my_angle_x, &xor_yaw);
 	WriteMem<DWORD>(client_dll + offsets::my_angle_y, &xor_pitch);
+
+
 
 	return;
 }
