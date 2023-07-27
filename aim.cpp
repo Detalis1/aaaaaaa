@@ -12,7 +12,7 @@ VOID RageAim(bool rcs = false)
 	int index = 0;
 
 
-	goto gofind;
+	
 	if(target_entity.address != NULL)
 	{
 		if (!EntityValid(target_entity.address))
